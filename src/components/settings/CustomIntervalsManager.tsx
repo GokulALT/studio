@@ -1,0 +1,115 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAppData } from "@/context/AppDataContext";
+import type { CustomInterval } from "@/lib/types";
+import { toast } from "@/hooks/use-toast";
+
+const intervalFormSchema = z.object({
+  name: z.string().min(3, { message: "Interval name must be at least 3 characters." }),
+  description: z.string().min(10, { message: "Description must be at least 10 characters." }),
+});
+
+export function CustomIntervalsManager() {
+  const { customIntervals, addCustomInterval } = useAppData();
+  const form = useForm<z.infer<typeof intervalFormSchema>>({
+    resolver: zodResolver(intervalFormSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+    }
+  });
+
+  function onSubmit(values: z.infer<typeof intervalFormSchema>) {
+    const newInterval: CustomInterval = {
+      id: crypto.randomUUID(),
+      name: values.name,
+      description: values.description,
+    };
+    addCustomInterval(newInterval);
+    toast({ title: "Custom Interval Added", description: `Successfully added "${values.name}".`});
+    form.reset();
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline">Add Custom Harvest Interval</CardTitle>
+          <CardDescription>Define your own harvest schedules or triggers.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Interval Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Bi-Monthly Harvest" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="e.g., Harvest every two months, starting January." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full">Add Interval</Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-headline">Defined Custom Intervals</CardTitle>
+          <CardDescription>List of your current custom harvest intervals.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {customIntervals.length === 0 ? (
+            <p>No custom intervals defined yet.</p>
+          ) : (
+            <ul className="space-y-3">
+              {customIntervals.map(interval => (
+                <li key={interval.id} className="p-3 border rounded-md bg-muted/30">
+                  <h4 className="font-semibold">{interval.name}</h4>
+                  <p className="text-sm text-muted-foreground">{interval.description}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+        <CardFooter>
+            <p className="text-xs text-muted-foreground">These intervals can be considered by the AI analysis.</p>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}
