@@ -3,27 +3,26 @@
 /**
  * @fileOverview Weather tool for fetching real rainfall data using Open-Meteo API.
  *
- * - getRainfallForLocationTool - An async function to fetch rainfall data using a Genkit tool.
- * - GetRainfallInputSchema - Zod schema for the input.
+ * - getRainfallForLocationTool - An async function to fetch rainfall data.
  * - GetRainfallInput - TypeScript type for the input.
- * - GetRainfallOutputSchema - Zod schema for the output.
  * - GetRainfallOutput - TypeScript type for the output.
  */
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { format } // Import format from date-fns
-from 'date-fns';
+import { format } from 'date-fns';
 
-export const GetRainfallInputSchema = z.object({
+// Internal Zod schema, not exported
+const GetRainfallInputSchemaInternal = z.object({
   location: z.string().describe('The location (e.g., city name) to fetch rainfall data for.'),
   date: z.string().describe('The ISO date string for which to fetch rainfall data (e.g., "2023-10-26T00:00:00.000Z").'),
 });
-export type GetRainfallInput = z.infer<typeof GetRainfallInputSchema>;
+export type GetRainfallInput = z.infer<typeof GetRainfallInputSchemaInternal>;
 
-export const GetRainfallOutputSchema = z.object({
+// Internal Zod schema, not exported
+const GetRainfallOutputSchemaInternal = z.object({
   amount: z.number().describe('The rainfall amount in mm.'),
 });
-export type GetRainfallOutput = z.infer<typeof GetRainfallOutputSchema>;
+export type GetRainfallOutput = z.infer<typeof GetRainfallOutputSchemaInternal>;
 
 interface GeoLocation {
   latitude: number;
@@ -34,10 +33,10 @@ interface GeoLocation {
 // Internal tool definition
 const _getRainfallForLocationExecutor = ai.defineTool(
   {
-    name: 'getRainfallForLocationInternalTool', // Changed name to reflect it's internal
+    name: 'getRainfallForLocationInternalTool',
     description: 'Fetches historical or forecast daily rainfall data for a given location and date using the Open-Meteo API.',
-    inputSchema: GetRainfallInputSchema,
-    outputSchema: GetRainfallOutputSchema,
+    inputSchema: GetRainfallInputSchemaInternal, // Uses internal schema
+    outputSchema: GetRainfallOutputSchemaInternal, // Uses internal schema
   },
   async (input: GetRainfallInput): Promise<GetRainfallOutput> => {
     console.log(`Fetching real weather data for location: ${input.location}, date: ${input.date}`);
@@ -68,7 +67,6 @@ const _getRainfallForLocationExecutor = ai.defineTool(
     }
 
     // 2. Fetch weather data for the geocoded location and date
-    // Format the date to YYYY-MM-DD for the Open-Meteo API
     const formattedDate = format(new Date(input.date), 'yyyy-MM-dd');
     
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${locationData.latitude}&longitude=${locationData.longitude}&daily=precipitation_sum&start_date=${formattedDate}&end_date=${formattedDate}&timezone=auto`;
@@ -82,7 +80,6 @@ const _getRainfallForLocationExecutor = ai.defineTool(
       
       if (!weatherJson.daily || !weatherJson.daily.precipitation_sum || weatherJson.daily.precipitation_sum.length === 0) {
         console.warn(`No precipitation data found for ${locationData.name} on ${formattedDate}. API response:`, weatherJson);
-        // Return 0 if data is missing but request was successful
         return { amount: 0 }; 
       }
       
