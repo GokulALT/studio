@@ -29,6 +29,7 @@ export interface RainfallData {
   id: string;
   date: string; // ISO string date
   amount: number; // in mm
+  location?: string; // Added location
 }
 
 export interface CustomInterval {

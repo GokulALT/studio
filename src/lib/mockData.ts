@@ -31,12 +31,12 @@ export const mockHarvestRecords: HarvestRecord[] = [
 ];
 
 export const mockRainfallData: RainfallData[] = [
-  { id: 'r1', date: new Date(2023, 0, 10).toISOString(), amount: 50 },
-  { id: 'r2', date: new Date(2023, 0, 25).toISOString(), amount: 20 },
-  { id: 'r3', date: new Date(2023, 1, 15).toISOString(), amount: 75 },
-  { id: 'r4', date: new Date(2023, 2, 5).toISOString(), amount: 10 },
-  { id: 'r5', date: new Date(2023, 3, 20).toISOString(), amount: 40 },
-  { id: 'r6', date: new Date(2023, 4, 1).toISOString(), amount: 60 },
+  { id: 'r1', date: new Date(2023, 0, 10).toISOString(), amount: 50, location: "Sample Farm A" },
+  { id: 'r2', date: new Date(2023, 0, 25).toISOString(), amount: 20, location: "Sample Farm A" },
+  { id: 'r3', date: new Date(2023, 1, 15).toISOString(), amount: 75, location: "Sample Farm B" },
+  { id: 'r4', date: new Date(2023, 2, 5).toISOString(), amount: 10, location: "Sample Farm B" },
+  { id: 'r5', date: new Date(2023, 3, 20).toISOString(), amount: 40, location: "Sample Farm C" },
+  { id: 'r6', date: new Date(2023, 4, 1).toISOString(), amount: 60, location: "Sample Farm C" },
 ];
 
 export const mockCustomIntervals: CustomInterval[] = [

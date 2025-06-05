@@ -15,44 +15,67 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Loader2 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useAppData } from "@/context/AppDataContext";
 import { toast } from "@/hooks/use-toast";
+import { fetchRainfallForLocation, type FetchRainfallInput } from "@/ai/flows/fetch-rainfall-flow";
+import type { RainfallData } from "@/lib/types";
+import { useState } from "react";
 
 const rainfallFormSchema = z.object({
   date: z.date({
-    required_error: "Date of rainfall is required.",
+    required_error: "Date is required to fetch rainfall data.",
   }),
-  amount: z.coerce.number({required_error: "Rainfall amount is required."}).positive("Rainfall amount must be a positive number."),
+  location: z.string().min(3, { message: "Location must be at least 3 characters." }),
 });
 
 export function RainfallForm() {
   const { addRainfallData } = useAppData();
+  const [isLoading, setIsLoading] = useState(false);
   const form = useForm<z.infer<typeof rainfallFormSchema>>({
     resolver: zodResolver(rainfallFormSchema),
     defaultValues: {
-      amount: 0,
+      location: "",
     }
   });
 
-  function onSubmit(values: z.infer<typeof rainfallFormSchema>) {
-    const newRainfall = {
-      id: crypto.randomUUID(),
-      date: values.date.toISOString(),
-      amount: values.amount,
-    };
-    addRainfallData(newRainfall);
-    toast({ title: "Rainfall Data Added", description: "Successfully logged new rainfall data." });
-    form.reset({amount: 0});
+  async function onSubmit(values: z.infer<typeof rainfallFormSchema>) {
+    setIsLoading(true);
+    try {
+      const input: FetchRainfallInput = {
+        location: values.location,
+        date: values.date.toISOString(),
+      };
+      const result = await fetchRainfallForLocation(input);
+
+      const newRainfall: RainfallData = {
+        id: crypto.randomUUID(),
+        date: values.date.toISOString(),
+        amount: result.amount,
+        location: values.location,
+      };
+      addRainfallData(newRainfall);
+      toast({ title: "Rainfall Data Fetched", description: `Successfully fetched ${result.amount}mm rainfall for ${values.location}.` });
+      form.reset({location: "", date: values.date}); // Reset location, keep date
+    } catch (error) {
+      console.error("Fetch Rainfall Error:", error);
+      toast({
+        title: "Fetch Failed",
+        description: error instanceof Error ? error.message : "An error occurred while fetching rainfall data. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="font-headline">Log Rainfall Data</CardTitle>
+        <CardTitle className="font-headline">Log Rainfall Data (Online)</CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -62,7 +85,7 @@ export function RainfallForm() {
               name="date"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Date of Rainfall</FormLabel>
+                  <FormLabel>Date for Rainfall Data</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -100,20 +123,32 @@ export function RainfallForm() {
             />
             <FormField
               control={form.control}
-              name="amount"
+              name="location"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Rainfall Amount (mm)</FormLabel>
+                  <FormLabel>Location (e.g., City)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="Enter rainfall amount" {...field} onChange={event => field.onChange(+event.target.value)} />
+                    <Input placeholder="Enter harvest location" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full">Add Rainfall Data</Button>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Fetching Rainfall...
+                </>
+              ) : (
+                "Fetch and Log Rainfall"
+              )}
+            </Button>
           </form>
         </Form>
+        <p className="text-xs text-muted-foreground mt-4">
+          Note: Rainfall data is fetched using a simulated API. In a real application, this would connect to a live weather service.
+        </p>
       </CardContent>
     </Card>
   );
