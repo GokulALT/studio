@@ -20,7 +20,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { useAppData } from "@/context/AppDataContext";
-import type { HarvestFormData } from "@/lib/types";
+import type { HarvestFormData, HarvestRecord, LaborCost, Expense } from "@/lib/types"; // Updated import
 import { toast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -28,6 +28,7 @@ const dateRequiredError = { required_error: "Date of harvest is required." };
 const numberRequiredError = (fieldName: string) => ({ required_error: `${fieldName} is required.` });
 const positiveNumberError = (fieldName: string) => `${fieldName} must be a positive number.`;
 
+// Schema for form validation
 const harvestFormSchema = z.object({
   date: z.date(dateRequiredError),
   coconutCount: z.coerce.number(numberRequiredError("Coconut count")).positive(positiveNumberError("Coconut count")),
@@ -48,46 +49,53 @@ const harvestFormSchema = z.object({
   fencingMaintenance: z.coerce.number().optional(),
 });
 
-const laborCostFields: (keyof HarvestFormData)[] = ['plucker', 'gatherer', 'peeler', 'driver', 'buyer', 'plumber', 'mechanic', 'maintenanceWorker'];
-const expenseFields: (keyof HarvestFormData)[] = ['fertilizer', 'motorMaintenance', 'fencingMaintenance'];
+// Type for form values, matching the schema
+type HarvestFormValues = z.infer<typeof harvestFormSchema>;
+
 
 export function HarvestForm() {
   const { addHarvestRecord } = useAppData();
-  const form = useForm<z.infer<typeof harvestFormSchema>>({
+  const form = useForm<HarvestFormValues>({ // Use HarvestFormValues
     resolver: zodResolver(harvestFormSchema),
     defaultValues: {
       coconutCount: 0,
       totalWeight: 0,
       salesPrice: 0,
+      // Optional fields default to undefined implicitly
     },
   });
 
-  function onSubmit(values: z.infer<typeof harvestFormSchema>) {
-    const newRecord = {
-      id: crypto.randomUUID(),
-      date: values.date.toISOString(),
+  async function onSubmit(values: HarvestFormValues) { // Use HarvestFormValues
+    const laborCosts: LaborCost = {
+      plucker: values.plucker,
+      gatherer: values.gatherer,
+      peeler: values.peeler,
+      driver: values.driver,
+      buyer: values.buyer,
+      plumber: values.plumber,
+      mechanic: values.mechanic,
+      maintenanceWorker: values.maintenanceWorker,
+    };
+    const expenses: Expense = {
+      fertilizer: values.fertilizer,
+      motorMaintenance: values.motorMaintenance,
+      fencingMaintenance: values.fencingMaintenance,
+    };
+
+    // Prepare data for addHarvestRecord which expects date as Date object
+    const recordToSave = {
+      date: values.date, // Pass Date object
       coconutCount: values.coconutCount,
       totalWeight: values.totalWeight,
       salesPrice: values.salesPrice,
-      laborCosts: {
-        plucker: values.plucker,
-        gatherer: values.gatherer,
-        peeler: values.peeler,
-        driver: values.driver,
-        buyer: values.buyer,
-        plumber: values.plumber,
-        mechanic: values.mechanic,
-        maintenanceWorker: values.maintenanceWorker,
-      },
-      expenses: {
-        fertilizer: values.fertilizer,
-        motorMaintenance: values.motorMaintenance,
-        fencingMaintenance: values.fencingMaintenance,
-      },
+      laborCosts,
+      expenses,
     };
-    addHarvestRecord(newRecord);
-    toast({ title: "Harvest Record Added", description: "Successfully logged new harvest." });
+
+    await addHarvestRecord(recordToSave);
+    // Toast is handled by AppDataContext
     form.reset({
+      date: undefined, // Reset date field
       coconutCount: 0,
       totalWeight: 0,
       salesPrice: 0,
@@ -97,7 +105,7 @@ export function HarvestForm() {
     });
   }
 
-  const renderNumberInput = (name: keyof HarvestFormData, label: string) => (
+  const renderNumberInput = (name: keyof HarvestFormValues, label: string) => (
     <FormField
       control={form.control}
       name={name}
@@ -105,7 +113,13 @@ export function HarvestForm() {
         <FormItem>
           <FormLabel>{label}</FormLabel>
           <FormControl>
-            <Input type="number" placeholder={`Enter ${label.toLowerCase()}`} {...field} onChange={event => field.onChange(+event.target.value)} />
+            <Input 
+              type="number" 
+              placeholder={`Enter ${label.toLowerCase()}`} 
+              {...field} 
+              value={field.value === undefined || field.value === null || Number.isNaN(field.value) ? '' : String(field.value)} // Handle undefined/NaN for display
+              onChange={event => field.onChange(event.target.value === '' ? undefined : +event.target.value)} // Set to undefined if empty
+            />
           </FormControl>
           <FormMessage />
         </FormItem>

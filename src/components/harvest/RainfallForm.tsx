@@ -32,43 +32,48 @@ const rainfallFormSchema = z.object({
   location: z.string().min(3, { message: "Location must be at least 3 characters." }),
 });
 
+type RainfallFormValues = z.infer<typeof rainfallFormSchema>;
+
 export function RainfallForm() {
   const { addRainfallData } = useAppData();
-  const [isLoading, setIsLoading] = useState(false);
-  const form = useForm<z.infer<typeof rainfallFormSchema>>({
+  const [isFetching, setIsFetching] = useState(false); // Renamed from isLoading to avoid conflict with AppContext
+  
+  const form = useForm<RainfallFormValues>({
     resolver: zodResolver(rainfallFormSchema),
     defaultValues: {
       location: "",
     }
   });
 
-  async function onSubmit(values: z.infer<typeof rainfallFormSchema>) {
-    setIsLoading(true);
+  async function onSubmit(values: RainfallFormValues) {
+    setIsFetching(true);
     try {
-      const input: FetchRainfallInput = {
+      const flowInput: FetchRainfallInput = {
         location: values.location,
-        date: values.date.toISOString(),
+        date: values.date.toISOString(), // Genkit flow expects ISO string
       };
-      const result = await fetchRainfallForLocation(input);
+      const result = await fetchRainfallForLocation(flowInput);
 
-      const newRainfall: RainfallData = {
-        id: crypto.randomUUID(),
-        date: values.date.toISOString(),
+      // Data for AppContext addRainfallData
+      const rainfallRecord = {
+        date: values.date, // Pass Date object
         amount: result.amount,
         location: values.location,
       };
-      addRainfallData(newRainfall);
-      toast({ title: "Rainfall Data Fetched", description: `Successfully fetched ${result.amount}mm rainfall for ${values.location}.` });
-      form.reset({location: "", date: values.date}); // Reset location, keep date
+      
+      await addRainfallData(rainfallRecord);
+      // Toast for success is handled by AppDataContext
+      form.reset({location: values.location, date: values.date}); // Reset, keep location/date for convenience
+      
     } catch (error) {
       console.error("Fetch Rainfall Error:", error);
-      toast({
+      toast({ // Explicit toast here for fetch-specific error
         title: "Fetch Failed",
-        description: error instanceof Error ? error.message : "An error occurred while fetching rainfall data. Please try again.",
+        description: error instanceof Error ? error.message : "An error occurred while fetching rainfall data.",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsFetching(false);
     }
   }
 
@@ -134,8 +139,8 @@ export function RainfallForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
+            <Button type="submit" className="w-full" disabled={isFetching}>
+              {isFetching ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Fetching Rainfall...

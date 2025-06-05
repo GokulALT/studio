@@ -1,3 +1,6 @@
+
+import type { ObjectId } from 'mongodb';
+
 export interface LaborCost {
   plucker?: number;
   gatherer?: number;
@@ -16,23 +19,26 @@ export interface Expense {
 }
 
 export interface HarvestRecord {
-  id: string;
+  _id?: ObjectId | string; // MongoDB's primary key
+  id: string; // Client-side/API consistent ID
   date: string; // ISO string date
   coconutCount: number;
   totalWeight: number; // in kg
-  salesPrice: number; // per unit (e.g., per coconut or per kg based on context)
+  salesPrice: number; // per unit
   laborCosts: LaborCost;
   expenses: Expense;
 }
 
 export interface RainfallData {
+  _id?: ObjectId | string;
   id: string;
   date: string; // ISO string date
   amount: number; // in mm
-  location?: string; // Added location
+  location?: string;
 }
 
 export interface CustomInterval {
+  _id?: ObjectId | string;
   id: string;
   name: string;
   description: string;
@@ -44,5 +50,18 @@ export interface AIAnalysisResult {
   historicalTrends: string;
 }
 
-// Helper type for form union
-export type HarvestFormData = Omit<HarvestRecord, 'id' | 'laborCosts' | 'expenses'> & LaborCost & Expense;
+// This type is used by HarvestForm, needs to align with how data is submitted.
+// The form itself passes a Date object for `date`.
+// The AppDataContext's addHarvestRecord expects a Date object and converts it to ISO string.
+export type HarvestFormData = 
+  Omit<HarvestRecord, 'id' | '_id' | 'date' | 'laborCosts' | 'expenses'> & 
+  { date: Date } & // Form uses Date object
+  LaborCost & 
+  Expense;
+
+// For RainfallForm
+export type RainfallFormData = 
+  Omit<RainfallData, 'id' | '_id' | 'date' | 'amount' | 'location'> & 
+  { date: Date, amount: number, location: string };
+
+
