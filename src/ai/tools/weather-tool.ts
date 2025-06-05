@@ -1,8 +1,13 @@
+
 'use server';
 /**
  * @fileOverview Weather tool for fetching real rainfall data using Open-Meteo API.
  *
- * - getRainfallForLocationTool - A Genkit tool to fetch rainfall data.
+ * - getRainfallForLocationTool - An async function to fetch rainfall data using a Genkit tool.
+ * - GetRainfallInputSchema - Zod schema for the input.
+ * - GetRainfallInput - TypeScript type for the input.
+ * - GetRainfallOutputSchema - Zod schema for the output.
+ * - GetRainfallOutput - TypeScript type for the output.
  */
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
@@ -26,9 +31,10 @@ interface GeoLocation {
   name: string;
 }
 
-export const getRainfallForLocationTool = ai.defineTool(
+// Internal tool definition
+const _getRainfallForLocationExecutor = ai.defineTool(
   {
-    name: 'getRainfallForLocationTool',
+    name: 'getRainfallForLocationInternalTool', // Changed name to reflect it's internal
     description: 'Fetches historical or forecast daily rainfall data for a given location and date using the Open-Meteo API.',
     inputSchema: GetRainfallInputSchema,
     outputSchema: GetRainfallOutputSchema,
@@ -95,3 +101,8 @@ export const getRainfallForLocationTool = ai.defineTool(
     }
   }
 );
+
+// Exported async wrapper function that conforms to 'use server' export requirements
+export async function getRainfallForLocationTool(input: GetRainfallInput): Promise<GetRainfallOutput> {
+  return _getRainfallForLocationExecutor(input);
+}
