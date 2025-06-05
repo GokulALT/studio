@@ -1,15 +1,17 @@
 'use server';
 /**
- * @fileOverview Weather tool for fetching simulated rainfall data.
+ * @fileOverview Weather tool for fetching real rainfall data using Open-Meteo API.
  *
- * - getRainfallForLocationTool - A Genkit tool to simulate fetching rainfall data.
+ * - getRainfallForLocationTool - A Genkit tool to fetch rainfall data.
  */
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { format } // Import format from date-fns
+from 'date-fns';
 
 export const GetRainfallInputSchema = z.object({
   location: z.string().describe('The location (e.g., city name) to fetch rainfall data for.'),
-  date: z.string().describe('The ISO date string for which to fetch rainfall data.'),
+  date: z.string().describe('The ISO date string for which to fetch rainfall data (e.g., "2023-10-26T00:00:00.000Z").'),
 });
 export type GetRainfallInput = z.infer<typeof GetRainfallInputSchema>;
 
@@ -18,32 +20,78 @@ export const GetRainfallOutputSchema = z.object({
 });
 export type GetRainfallOutput = z.infer<typeof GetRainfallOutputSchema>;
 
+interface GeoLocation {
+  latitude: number;
+  longitude: number;
+  name: string;
+}
+
 export const getRainfallForLocationTool = ai.defineTool(
   {
     name: 'getRainfallForLocationTool',
-    description: 'Simulates fetching rainfall data for a given location and date from an external weather API. In a real application, this would call a weather service.',
+    description: 'Fetches historical or forecast daily rainfall data for a given location and date using the Open-Meteo API.',
     inputSchema: GetRainfallInputSchema,
     outputSchema: GetRainfallOutputSchema,
   },
   async (input: GetRainfallInput): Promise<GetRainfallOutput> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    console.log(`Fetching real weather data for location: ${input.location}, date: ${input.date}`);
 
-    console.log(`Simulating weather API call for location: ${input.location}, date: ${input.date}`);
-    
-    let amount = Math.floor(Math.random() * 30) + 1; // Default random amount 1-30mm
-    if (input.location.toLowerCase().includes('desert')) {
-      amount = Math.floor(Math.random() * 5); // 0-4mm for deserts
-    } else if (input.location.toLowerCase().includes('rainforest')) {
-      amount = Math.floor(Math.random() * 50) + 20; // 20-69mm for rainforests
-    } else if (input.location.toLowerCase().includes('london')) {
-      amount = Math.floor(Math.random() * 15) + 5; // 5-19mm for London
-    }
-    
-    if (Math.random() < 0.05) {
-        throw new Error("Simulated API error: Could not fetch weather data for the location.");
+    // 1. Geocode location to get latitude and longitude
+    const geocodingUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(input.location)}&count=1&language=en&format=json`;
+    let locationData: GeoLocation;
+
+    try {
+      const geoResponse = await fetch(geocodingUrl);
+      if (!geoResponse.ok) {
+        throw new Error(`Geocoding API request failed with status ${geoResponse.status}`);
+      }
+      const geoJson = await geoResponse.json();
+      if (!geoJson.results || geoJson.results.length === 0) {
+        throw new Error(`Could not find location: ${input.location}`);
+      }
+      const firstResult = geoJson.results[0];
+      locationData = {
+        latitude: firstResult.latitude,
+        longitude: firstResult.longitude,
+        name: firstResult.name,
+      };
+      console.log(`Geocoded ${input.location} to: Lat ${locationData.latitude}, Lon ${locationData.longitude}`);
+    } catch (error) {
+      console.error("Geocoding Error:", error);
+      throw new Error(error instanceof Error ? `Failed to geocode location: ${error.message}` : "An unknown error occurred during geocoding.");
     }
 
-    return { amount };
+    // 2. Fetch weather data for the geocoded location and date
+    // Format the date to YYYY-MM-DD for the Open-Meteo API
+    const formattedDate = format(new Date(input.date), 'yyyy-MM-dd');
+    
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${locationData.latitude}&longitude=${locationData.longitude}&daily=precipitation_sum&start_date=${formattedDate}&end_date=${formattedDate}&timezone=auto`;
+
+    try {
+      const weatherResponse = await fetch(weatherUrl);
+      if (!weatherResponse.ok) {
+        throw new Error(`Weather API request failed with status ${weatherResponse.status}`);
+      }
+      const weatherJson = await weatherResponse.json();
+      
+      if (!weatherJson.daily || !weatherJson.daily.precipitation_sum || weatherJson.daily.precipitation_sum.length === 0) {
+        console.warn(`No precipitation data found for ${locationData.name} on ${formattedDate}. API response:`, weatherJson);
+        // Return 0 if data is missing but request was successful
+        return { amount: 0 }; 
+      }
+      
+      const rainfallAmount = weatherJson.daily.precipitation_sum[0];
+      if (rainfallAmount === null || rainfallAmount === undefined) {
+         console.warn(`Precipitation data was null/undefined for ${locationData.name} on ${formattedDate}. Assuming 0mm.`);
+         return { amount: 0 };
+      }
+
+      console.log(`Fetched rainfall for ${locationData.name} on ${formattedDate}: ${rainfallAmount}mm`);
+      return { amount: rainfallAmount };
+
+    } catch (error) {
+      console.error("Weather API Error:", error);
+      throw new Error(error instanceof Error ? `Failed to fetch weather data: ${error.message}` : "An unknown error occurred while fetching weather data.");
+    }
   }
 );

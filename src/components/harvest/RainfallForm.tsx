@@ -147,7 +147,7 @@ export function RainfallForm() {
           </form>
         </Form>
         <p className="text-xs text-muted-foreground mt-4">
-          Note: Rainfall data is fetched using a simulated API. In a real application, this would connect to a live weather service.
+          Note: Rainfall data is fetched using the Open-Meteo API.
         </p>
       </CardContent>
     </Card>
