@@ -1,3 +1,4 @@
+
 // @ts-nocheck because of temporary any types until full typing of API responses
 "use client";
 
@@ -46,9 +47,37 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
           fetch('/api/intervals'),
         ]);
 
-        if (!harvestRes.ok) console.error("Failed to fetch harvest records:", await harvestRes.text());
-        if (!rainfallRes.ok) console.error("Failed to fetch rainfall data:", await rainfallRes.text());
-        if (!intervalsRes.ok) console.error("Failed to fetch custom intervals:", await intervalsRes.text());
+        let harvestError: string | null = null;
+        let rainfallError: string | null = null;
+        let intervalsError: string | null = null;
+
+        if (!harvestRes.ok) {
+          try {
+            const err = await harvestRes.json();
+            harvestError = err.message || `Failed to fetch harvest records (status: ${harvestRes.status})`;
+          } catch (e) {
+            harvestError = `Failed to fetch harvest records (HTTP ${harvestRes.status})`;
+          }
+          console.error("Harvest fetch error details:", harvestError, harvestRes);
+        }
+        if (!rainfallRes.ok) {
+           try {
+            const err = await rainfallRes.json();
+            rainfallError = err.message || `Failed to fetch rainfall data (status: ${rainfallRes.status})`;
+          } catch (e) {
+            rainfallError = `Failed to fetch rainfall data (HTTP ${rainfallRes.status})`;
+          }
+          console.error("Rainfall fetch error details:", rainfallError, rainfallRes);
+        }
+        if (!intervalsRes.ok) {
+          try {
+            const err = await intervalsRes.json();
+            intervalsError = err.message || `Failed to fetch custom intervals (status: ${intervalsRes.status})`;
+          } catch (e) {
+            intervalsError = `Failed to fetch custom intervals (HTTP ${intervalsRes.status})`;
+          }
+          console.error("Intervals fetch error details:", intervalsError, intervalsRes);
+        }
 
         const harvest = harvestRes.ok ? await harvestRes.json() : [];
         const rainfall = rainfallRes.ok ? await rainfallRes.json() : [];
@@ -58,10 +87,19 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         setRainfallData(Array.isArray(rainfall) ? rainfall : []);
         setCustomIntervals(Array.isArray(intervals) ? intervals : []);
 
+        const errorMessages = [harvestError, rainfallError, intervalsError].filter(Boolean);
+        if (errorMessages.length > 0) {
+            toast({
+                title: "Data Loading Issue",
+                description: `Could not load some app data: ${errorMessages.join('; ')}. Please check console for details.`,
+                variant: "destructive",
+                duration: 7000,
+            });
+        }
+
       } catch (error) {
-        console.error("Error loading initial data from API:", error);
-        toast({ title: "Error", description: "Could not load app data.", variant: "destructive" });
-        // Set to empty arrays on error to prevent app crash
+        console.error("Network or other error loading initial data from API:", error);
+        toast({ title: "Error", description: "Could not load app data. Check network connection and console for details.", variant: "destructive", duration: 7000 });
         setHarvestRecords([]);
         setRainfallData([]);
         setCustomIntervals([]);
@@ -89,8 +127,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         throw new Error(errorData.message || 'Failed to save harvest record');
       }
       const savedRecord = await response.json();
-      // Ensure savedRecord.date is an ISO string before adding to state.
-      // The API POST for harvest should return the date as an ISO string.
       setHarvestRecords(prev => [savedRecord, ...prev].sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
       toast({ title: "Success", description: "Harvest record added." });
     } catch (error) {
@@ -169,3 +205,4 @@ export const useAppData = (): AppDataContextType => {
   }
   return context;
 };
+
